@@ -1,6 +1,15 @@
 package com.facebook.sdk.action;
 
-import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.PlatformDataKeys;
+import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
+
+import javax.annotation.Nullable;
 
 public class FacebookSDKAppEventAction extends AnAction {
 
@@ -18,7 +27,8 @@ public class FacebookSDKAppEventAction extends AnAction {
         }
     }
 
-    private static @Nullable VirtualFile findFile(VirtualFile dir, String fileName) {
+    @Nullable
+    private static VirtualFile findFile(VirtualFile dir, String fileName) {
         VirtualFile virtualFile = dir.findChild(fileName);
         if (virtualFile != null) {
             return virtualFile;
@@ -46,5 +56,6 @@ public class FacebookSDKAppEventAction extends AnAction {
     }
 
     private static String formatManifestWithAppId(String manifestText) {
+        return manifestText;
     }
 }
