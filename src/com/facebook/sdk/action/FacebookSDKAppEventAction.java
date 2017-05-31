@@ -1,32 +1,16 @@
-package com.facebook.sdk;
+package com.facebook.sdk.action;
 
-import com.intellij.openapi.actionSystem.AnAction;
-import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.actionSystem.PlatformDataKeys;
-import com.intellij.openapi.command.WriteCommandAction;
-import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.roots.ProjectRootManager;
-import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.actionSystem.*;
 
-import javax.annotation.Nullable;
+public class FacebookSDKAppEventAction extends AnAction {
 
-public class FacebookSDKInitClass extends AnAction {
-    public FacebookSDKInitClass() {
-        super("Configure Facebook SDK...");
-        // super("Text _Boxes","Item description",IconLoader.getIcon("/Mypackage/icon.png"));
+    public FacebookSDKAppEventAction() {
+        super("Generate App Event Configuration...");
     }
 
     @Override
     public void actionPerformed(AnActionEvent e) {
         Project project = e.getData(PlatformDataKeys.PROJECT);
-        /*
-        String txt = Messages.showInputDialog(project, "What is your Facebook app ID?", "Input your app ID", Messages.getQuestionIcon());
-        Messages.showMessageDialog(project, "Your Facebook app ID is: " + txt, "Information", Messages.getInformationIcon());
-        */
-
         VirtualFile baseDir = project.getBaseDir();
         VirtualFile manifestFile = findFile(baseDir, "AndroidManifest.xml");
         if (manifestFile == null) {
@@ -62,6 +46,5 @@ public class FacebookSDKInitClass extends AnAction {
     }
 
     private static String formatManifestWithAppId(String manifestText) {
-        
     }
 }
