@@ -28,21 +28,12 @@
     <!-- Add your extensions here -->
   </extensions>
 
-  <!--<actions>-->
-    <!--&lt;!&ndash; Add your actions here &ndash;&gt;-->
-    <!--&lt;!&ndash;<group id="FacebookSDK.Init" text="Facebook" description="Facebook menu">&ndash;&gt;-->
-      <!--&lt;!&ndash;<add-to-group group-id="MainMenu" anchor="last"  />&ndash;&gt;-->
-      <!--&lt;!&ndash;<action id="Myplugin.Textboxes" class="com.facebook.sdk.FacebookSDKInitClass" text="Import SDK..." description="A test menu item" />&ndash;&gt;-->
-    <!--&lt;!&ndash;</group>&ndash;&gt;-->
-    <!--<action id="FacebookSDK.Init" class="com.facebook.sdk.FacebookSDKInitClass" text="Configure Facebook SDK..." description="Configure Facebook SDK">-->
-      <!--<add-to-group group-id="ToolsMenu" relative-to-action="GenerateJavadoc" anchor="after"/>-->
-    <!--</action>-->
-  <!--</actions>-->
-
-  <application-components>
-    <component>
-      <implementation-class>com.facebook.sdk.FacebookSDKRegistration</implementation-class>
-    </component>
-  </application-components>
+  <actions>
+    <group id="FacebookSDK.Init" text="Facebook SDK" description="Facebook SDK menu">
+      <add-to-group group-id="MainMenu" anchor="last" />
+      <action id="FacebookSDK.Install" class="com.facebook.sdk.action.FacebookSDKInstallAction" text="Install SDK..." description="Install Facebook SDK" />
+      <action id="FacebookSDK.ConfigureEvents" class="com.facebook.sdk.action.FacebookSDKAppEventAction" text="Generate App Event Configuration..." description="Generate App Event Configuration" />
+    </group>
+  </actions>
 
 </idea-plugin>
