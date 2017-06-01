@@ -1,5 +1,6 @@
 package com.facebook.sdk.action;
 
+import com.intellij.lang.ASTNode;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.PlatformDataKeys;
@@ -8,6 +9,9 @@ import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.*;
+import com.intellij.psi.codeStyle.JavaCodeStyleManager;
+import com.intellij.psi.impl.java.stubs.JavaStubElementTypes;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xml.sax.InputSource;
@@ -16,10 +20,16 @@ import org.xml.sax.SAXException;
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.*;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
-import javax.xml.xpath.*;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
@@ -50,6 +60,8 @@ public class FacebookSDKAppEventAction extends AnAction {
         addAppId(project, manifestFile, appId);
 
         addActivateApp(project, manifestFile);
+
+        Messages.showMessageDialog("The Facebook SDK has been added.", "Success", Messages.getInformationIcon());
     }
 
     private static VirtualFile findFile(VirtualFile dir, String fileName) {
@@ -70,12 +82,15 @@ public class FacebookSDKAppEventAction extends AnAction {
 
     private static boolean addAppId(Project project, VirtualFile file, String appId) {
         final com.intellij.openapi.editor.Document document = FileDocumentManager.getInstance().getDocument(file);
+        if (document == null) {
+            return false;
+        }
         new WriteCommandAction.Simple(project) {
             @Override protected void run() throws Throwable {
                 document.setText(formatManifest(document.getText(), appId));
             }
         }.execute();
-        return false;
+        return true;
     }
 
     private static String formatManifest(String manifestText, String appId) {
@@ -133,16 +148,76 @@ public class FacebookSDKAppEventAction extends AnAction {
     }
 
     private static boolean addActivateApp(Project project, VirtualFile manifestFile) {
-        final com.intellij.openapi.editor.Document document = findMainActivity(project, manifestFile);
+        VirtualFile mainActivityVirtualFile = findMainActivity(project, manifestFile);
+        if (mainActivityVirtualFile == null) {
+            return false;
+        }
+        PsiJavaFile mainActivityPsi = (PsiJavaFile) PsiManager.getInstance(project).findFile(mainActivityVirtualFile);
+        ASTNode[] children =
+                mainActivityPsi.getNode().findChildByType(JavaStubElementTypes.IMPORT_LIST).getChildren(null);
+        PsiJavaCodeReferenceElement prevImport = null;
+        for (ASTNode child : children) {
+            if (child.getElementType() != JavaStubElementTypes.IMPORT_STATEMENT) {
+                continue;
+            }
+            PsiJavaCodeReferenceElement importedReference = null;
+            for (ASTNode grandchild : child.getChildren(null)) {
+                if (grandchild instanceof PsiJavaCodeReferenceElement) {
+                    importedReference = (PsiJavaCodeReferenceElement) grandchild;
+                    break;
+                }
+            }
+            int compared = importedReference.getText().compareTo("com.facebook.FacebookSdk");
+            if (compared < 0) {
+                prevImport = importedReference;
+                continue;
+            } else if (compared == 0) {
+                prevImport = importedReference;
+                break;
+            } else {
+                break;
+            }
+        }
+        if (prevImport == null) {
+            // TODO: insert import wherever
+        }
+        if (!prevImport.getText().equals("com.facebook.FacebookSdk")) {
+            // TODO: insert import
+        }
+
+        PsiClass[] classes = mainActivityPsi.getClasses();
+        PsiClass mainActivityClass = null;
+        for (PsiClass _class : classes) {
+            if (mainActivityPsi.getName().contains(_class.getName())) {
+                mainActivityClass = _class;
+            }
+        }
+        if (mainActivityClass == null) {
+            return false;
+        }
+        PsiMethod[] onCreateMethods = mainActivityClass.findMethodsByName("onCreate", false);
+        if (onCreateMethods.length == 0) {
+            return false;
+        }
+
+        PsiMethod onCreateMethod = onCreateMethods[0];
+        PsiElementFactory elementFactory = JavaPsiFacade.getElementFactory(project);
+        PsiStatement sdkInitializeStatement = elementFactory.createStatementFromText(
+                "com.facebook.FacebookSdk.sdkInitialize(getApplicationContext());",
+                onCreateMethod);
+        JavaCodeStyleManager styleManager = JavaCodeStyleManager.getInstance(project);
         new WriteCommandAction.Simple(project) {
             @Override protected void run() throws Throwable {
-                document.setText(formatActivity(document.getText()));
+                styleManager.optimizeImports(mainActivityPsi);
+                styleManager.shortenClassReferences(sdkInitializeStatement);
+                onCreateMethod.addAfter(sdkInitializeStatement, onCreateMethod.getBody().getLastBodyElement());
+                mainActivityVirtualFile.setBinaryContent(mainActivityPsi.getText().getBytes());
             }
         }.execute();
-        return false;
+        return true;
     }
 
-    private static com.intellij.openapi.editor.Document findMainActivity(Project project, VirtualFile manifestFile) {
+    private static VirtualFile findMainActivity(Project project, VirtualFile manifestFile) {
         String activityName = null;
         try {
             DocumentBuilderFactory docFactory = DocumentBuilderFactory.newInstance();
@@ -171,10 +246,7 @@ public class FacebookSDKAppEventAction extends AnAction {
         }
         activityName = activityName.substring(activityName.lastIndexOf('.') + 1);
         VirtualFile virtualFile = findFile(project.getBaseDir(), activityName + ".java");
-        if (virtualFile == null) {
-            return null;
-        }
-        return FileDocumentManager.getInstance().getDocument(virtualFile);
+        return virtualFile;
     }
 
     private static String formatActivity(String activityText) {
