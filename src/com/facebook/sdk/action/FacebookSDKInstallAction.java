@@ -2,7 +2,10 @@ package com.facebook.sdk.action;
 
 import com.facebook.sdk.DownloadUtils;
 
+import com.facebook.sdk.PluginUtils;
 import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.application.Application;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 
 public class FacebookSDKInstallAction extends AnAction {
@@ -14,7 +17,30 @@ public class FacebookSDKInstallAction extends AnAction {
 
     @Override
     public void actionPerformed(AnActionEvent e) {
+        Application application = ApplicationManager.getApplication();
         Project project = e.getProject();
-        DownloadUtils.downloadSDK(project);
+
+        Runnable downloadSDK = new Runnable() {
+            @Override
+            public void run() {
+                if (DownloadUtils.installSdk(project)) {
+                    application.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            PluginUtils.showInfo(project, "SDK Integration completed.");
+                        }
+                    });
+                } else {
+                    application.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            PluginUtils.showError(project, "SDK Integration failed.");
+                        }
+                    });
+                }
+            }
+        };
+
+        new Thread(downloadSDK).start();
     }
 }
