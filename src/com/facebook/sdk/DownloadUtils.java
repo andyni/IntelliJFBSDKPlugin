@@ -1,6 +1,10 @@
 package com.facebook.sdk;
 
+import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -10,6 +14,8 @@ import java.net.URL;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.util.Date;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -21,6 +27,20 @@ public class DownloadUtils {
     private static final int BUFFER_SIZE = 4096;
 
     public static boolean installSdk(Project project) {
+        VirtualFile baseDir = project.getBaseDir();
+        VirtualFile gradleFile = findFile(baseDir, "build.gradle");
+        if (gradleFile != null) {
+            final Document document = FileDocumentManager.getInstance().getDocument(gradleFile);
+            new WriteCommandAction.Simple(project) {
+                @Override protected void run() throws Throwable {
+                    document.setText(formatGradle(document.getText()));
+                }
+            }.execute();
+
+            return true;
+        }
+
+        // Fallback to download
         try {
             File tempFile = File.createTempFile("facebook-sdk" + new Date().getTime(), ".zip");
 
@@ -33,6 +53,45 @@ public class DownloadUtils {
             e.printStackTrace();
             return false;
         }
+    }
+
+    private static String formatGradle(String text) {
+        Pattern repository_pattern = Pattern.compile("repositories(\\s)*\\{([^\\}]+)\\}");
+        Pattern dependencies_pattern = Pattern.compile("dependencies(\\s)*\\{([^\\}]+)\\}");
+        Matcher repository_matcher = repository_pattern.matcher(text);
+        Matcher dependencies_matcher = dependencies_pattern.matcher(text);
+
+        if (repository_matcher.find()) {
+            String repositories = repository_matcher.group(2);
+            if (repositories.indexOf("mavenCentral()") == -1) {
+                text = text.replace(repositories, repositories + "    mavenCentral()\n");
+            }
+        }
+
+        if (dependencies_matcher.find()) {
+            String dependencies = dependencies_matcher.group(2);
+            if (dependencies.indexOf("com.facebook.android:facebook-android-sdk") == -1) {
+                text = text.replace(dependencies, dependencies + "    compile 'com.facebook.android:facebook-android-sdk:[4,5)'\n");
+            }
+        }
+
+        return text;
+    }
+
+    private static VirtualFile findFile(VirtualFile dir, String fileName) {
+        VirtualFile virtualFile = dir.findChild(fileName);
+        if (virtualFile != null) {
+            return virtualFile;
+        }
+        for (VirtualFile child : dir.getChildren()) {
+            if (child.isDirectory()) {
+                VirtualFile childVirtualFile = findFile(child, fileName);
+                if (childVirtualFile != null) {
+                    return childVirtualFile;
+                }
+            }
+        }
+        return null;
     }
 
     private static void unzipSdkToRoot(Project project, File zipFile) {
