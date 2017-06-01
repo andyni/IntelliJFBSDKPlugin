@@ -28,7 +28,7 @@ public class DownloadUtils {
 
     public static boolean installSdk(Project project) {
         VirtualFile baseDir = project.getBaseDir();
-        VirtualFile gradleFile = findFile(baseDir, "build.gradle");
+        VirtualFile gradleFile = findFile(baseDir.findChild("app"), "build.gradle");
         if (gradleFile != null) {
             final Document document = FileDocumentManager.getInstance().getDocument(gradleFile);
             new WriteCommandAction.Simple(project) {
@@ -61,7 +61,9 @@ public class DownloadUtils {
         Matcher repository_matcher = repository_pattern.matcher(text);
         Matcher dependencies_matcher = dependencies_pattern.matcher(text);
 
-        if (repository_matcher.find()) {
+
+        boolean repository_exists = repository_matcher.find();
+        if (repository_exists) {
             String repositories = repository_matcher.group(2);
             if (repositories.indexOf("mavenCentral()") == -1) {
                 text = text.replace(repositories, repositories + "    mavenCentral()\n");
@@ -70,9 +72,16 @@ public class DownloadUtils {
 
         if (dependencies_matcher.find()) {
             String dependencies = dependencies_matcher.group(2);
+            String temp = dependencies_matcher.group(2);
             if (dependencies.indexOf("com.facebook.android:facebook-android-sdk") == -1) {
-                text = text.replace(dependencies, dependencies + "    compile 'com.facebook.android:facebook-android-sdk:[4,5)'\n");
+                temp = "\n    compile 'com.facebook.android:facebook-android-sdk:[4,5)'\n" + temp;
             }
+
+            if (!repository_exists) {
+                temp = "repositories {\n    mavenCentral()\n}\n\n" + temp;
+            }
+
+            text = text.replace(dependencies, temp);
         }
 
         return text;
