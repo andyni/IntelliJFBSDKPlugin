@@ -41,12 +41,15 @@ public class FacebookSDKAppEventAction extends AnAction {
         if (manifestFile == null) {
             return;
         }
+
         String appId = Messages.showInputDialog(
                 project,
                 "What is your Facebook application ID?",
                 "Input your application ID",
                 Messages.getQuestionIcon());
         addAppId(project, manifestFile, appId);
+
+        addActivateApp(project, manifestFile);
     }
 
     private static VirtualFile findFile(VirtualFile dir, String fileName) {
@@ -127,6 +130,55 @@ public class FacebookSDKAppEventAction extends AnAction {
             e.printStackTrace();
         }
         return manifestText;
+    }
+
+    private static boolean addActivateApp(Project project, VirtualFile manifestFile) {
+        final com.intellij.openapi.editor.Document document = findMainActivity(project, manifestFile);
+        new WriteCommandAction.Simple(project) {
+            @Override protected void run() throws Throwable {
+                document.setText(formatActivity(document.getText()));
+            }
+        }.execute();
+        return false;
+    }
+
+    private static com.intellij.openapi.editor.Document findMainActivity(Project project, VirtualFile manifestFile) {
+        String activityName = null;
+        try {
+            DocumentBuilderFactory docFactory = DocumentBuilderFactory.newInstance();
+            String manifestText = FileDocumentManager.getInstance().getDocument(manifestFile).getText();
+            Document manifestDoc = docFactory.newDocumentBuilder().parse(new InputSource(new StringReader(manifestText)));
+
+            XPathFactory xPathfactory = XPathFactory.newInstance();
+            XPath xpath = xPathfactory.newXPath();
+            xpath.setNamespaceContext(new AndroidNamespaceContext());
+            activityName = (String) xpath.evaluate(
+                    "manifest/application/activity/intent-filter/category[@name='android.intent.category.LAUNCHER']/ancestor::activity/@name",
+                    manifestDoc,
+                    XPathConstants.STRING);
+        } catch (SAXException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ParserConfigurationException e) {
+            e.printStackTrace();
+        } catch (XPathExpressionException e) {
+            e.printStackTrace();
+        }
+
+        if (activityName == null || activityName.isEmpty()) {
+            return null;
+        }
+        activityName = activityName.substring(activityName.lastIndexOf('.') + 1);
+        VirtualFile virtualFile = findFile(project.getBaseDir(), activityName + ".java");
+        if (virtualFile == null) {
+            return null;
+        }
+        return FileDocumentManager.getInstance().getDocument(virtualFile);
+    }
+
+    private static String formatActivity(String activityText) {
+        return activityText;
     }
 
     private static class AndroidNamespaceContext implements NamespaceContext {
