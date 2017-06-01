@@ -48,6 +48,7 @@ public class FacebookSDKAppEventAction extends AnAction {
         Project project = e.getData(PlatformDataKeys.PROJECT);
         VirtualFile baseDir = project.getBaseDir();
         VirtualFile manifestFile = findFile(baseDir, "AndroidManifest.xml");
+        VirtualFile stringsFile = findFile(baseDir, "strings.xml");
         if (manifestFile == null) {
             return;
         }
@@ -58,6 +59,7 @@ public class FacebookSDKAppEventAction extends AnAction {
                 "Input your application ID",
                 Messages.getQuestionIcon());
         addAppId(project, manifestFile, appId);
+        addAppIdToStrings(project, stringsFile, appId);
 
         addActivateApp(project, manifestFile);
 
@@ -93,6 +95,50 @@ public class FacebookSDKAppEventAction extends AnAction {
         return true;
     }
 
+    private static boolean addAppIdToStrings(Project project, VirtualFile file, String appId) {
+        final com.intellij.openapi.editor.Document document = FileDocumentManager.getInstance().getDocument(file);
+        if (document == null) {
+            return false;
+        }
+        new WriteCommandAction.Simple(project) {
+            @Override protected void run() throws Throwable {
+                document.setText(formatStrings(document.getText(), appId));
+            }
+        }.execute();
+        return true;
+    }
+
+    private static String formatStrings(String stringsText, String appId) {
+        try {
+            DocumentBuilderFactory docFactory = DocumentBuilderFactory.newInstance();
+            Document doc = docFactory.newDocumentBuilder().parse(new InputSource(new StringReader(stringsText)));
+            Element stringsRoot = doc.getDocumentElement();
+
+            Element appIdElement = doc.createElement("string");
+            appIdElement.setAttribute("name", "facebook_app_id");
+            appIdElement.setTextContent(appId);
+            stringsRoot.appendChild(appIdElement);
+
+            DOMSource domSource = new DOMSource(doc);
+            StringWriter writer = new StringWriter();
+            StreamResult result = new StreamResult(writer);
+            Transformer transformer = TransformerFactory.newInstance().newTransformer();
+            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+            transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
+            transformer.transform(domSource, result);
+            return writer.toString();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ParserConfigurationException e) {
+            e.printStackTrace();
+        } catch (SAXException e) {
+            e.printStackTrace();
+        } catch (TransformerException e) {
+            e.printStackTrace();
+        }
+        return stringsText;
+    }
+
     private static String formatManifest(String manifestText, String appId) {
         try {
             DocumentBuilderFactory docFactory = DocumentBuilderFactory.newInstance();
@@ -121,7 +167,7 @@ public class FacebookSDKAppEventAction extends AnAction {
                 Element applicationElement = (Element) xpath.evaluate("/manifest/application", doc, XPathConstants.NODE);
                 Element metadataElement = doc.createElement("meta-data");
                 metadataElement.setAttributeNS(ANDROID_NS_URI, "android:name", "com.facebook.sdk.ApplicationId");
-                metadataElement.setAttributeNS(ANDROID_NS_URI, "android:value", appId);
+                metadataElement.setAttributeNS(ANDROID_NS_URI, "android:value", "@string/facebook_app_id");
                 applicationElement.appendChild(metadataElement);
             }
 
@@ -205,12 +251,17 @@ public class FacebookSDKAppEventAction extends AnAction {
         PsiStatement sdkInitializeStatement = elementFactory.createStatementFromText(
                 "com.facebook.FacebookSdk.sdkInitialize(getApplicationContext());",
                 onCreateMethod);
+        PsiStatement activateAppStatement = elementFactory.createStatementFromText(
+                "com.facebook.appevents.AppEventsLogger.activateApp(this);",
+                onCreateMethod);
         JavaCodeStyleManager styleManager = JavaCodeStyleManager.getInstance(project);
         new WriteCommandAction.Simple(project) {
             @Override protected void run() throws Throwable {
                 styleManager.optimizeImports(mainActivityPsi);
                 styleManager.shortenClassReferences(sdkInitializeStatement);
+                styleManager.shortenClassReferences(activateAppStatement);
                 onCreateMethod.addAfter(sdkInitializeStatement, onCreateMethod.getBody().getLastBodyElement());
+                onCreateMethod.addAfter(activateAppStatement, onCreateMethod.getBody().getLastBodyElement());
                 mainActivityVirtualFile.setBinaryContent(mainActivityPsi.getText().getBytes());
             }
         }.execute();
