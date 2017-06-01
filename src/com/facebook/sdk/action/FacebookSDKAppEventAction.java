@@ -9,8 +9,6 @@ import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 
-import javax.annotation.Nullable;
-
 public class FacebookSDKAppEventAction extends AnAction {
 
     public FacebookSDKAppEventAction() {
@@ -27,7 +25,6 @@ public class FacebookSDKAppEventAction extends AnAction {
         }
     }
 
-    @Nullable
     private static VirtualFile findFile(VirtualFile dir, String fileName) {
         VirtualFile virtualFile = dir.findChild(fileName);
         if (virtualFile != null) {
