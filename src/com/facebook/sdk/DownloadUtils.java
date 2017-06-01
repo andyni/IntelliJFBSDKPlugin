@@ -71,17 +71,15 @@ public class DownloadUtils {
         }
 
         if (dependencies_matcher.find()) {
-            String dependencies = dependencies_matcher.group(2);
-            String temp = dependencies_matcher.group(2);
-            if (dependencies.indexOf("com.facebook.android:facebook-android-sdk") == -1) {
-                temp = "\n    compile 'com.facebook.android:facebook-android-sdk:[4,5)'\n" + temp;
-            }
-
             if (!repository_exists) {
-                temp = "repositories {\n    mavenCentral()\n}\n\n" + temp;
+                String dependencies = dependencies_matcher.group(0);
+                text = text.replace(dependencies, "repositories {\n    mavenCentral()\n}\n\n" + dependencies);
             }
 
-            text = text.replace(dependencies, temp);
+            String dependencies = dependencies_matcher.group(2);
+            if (dependencies.indexOf("com.facebook.android:facebook-android-sdk") == -1) {
+                text = text.replace(dependencies, "\n    compile 'com.facebook.android:facebook-android-sdk:[4,5)'\n" + dependencies);
+            }
         }
 
         return text;
